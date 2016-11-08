@@ -1,16 +1,29 @@
 package minhal.tomer.edu.locationdemos;
 
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.location.Location;
 import android.net.Uri;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
+import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.TextView;
+import android.widget.Toast;
 
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.location.LocationListener;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
@@ -20,7 +33,15 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 
-public class MainActivity extends AppCompatActivity implements OnMapReadyCallback {
+public class MainActivity extends AppCompatActivity implements OnMapReadyCallback,
+        GoogleApiClient.ConnectionCallbacks,
+        GoogleApiClient.OnConnectionFailedListener, LocationListener {
+
+    private static final int REQUEST_LOCATION = 10;
+
+    //Used later for location Requests.
+    private GoogleApiClient mApiClient;
+    private TextView tvLocation;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -28,7 +49,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         setContentView(R.layout.activity_main);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-
+        tvLocation = (TextView) findViewById(R.id.tvLocation);
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -37,6 +58,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             }
         });
 
+
+        requestLocation();
         if (savedInstanceState == null) {
             SupportMapFragment mapFragment = new SupportMapFragment();
 
@@ -87,5 +110,75 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         );
 
         map.animateCamera(CameraUpdateFactory.newLatLngZoom(markerPosition, 12));
+    }
+
+    //Method that requires Permission
+    public void requestLocation() {
+        //if no permission -> Request it and return away from the method:
+        if (ActivityCompat.checkSelfPermission(this,
+                Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_LOCATION);
+            return;
+        }
+        //we have the permission, Start Initing the API Client
+        GoogleApiClient.Builder builder = new GoogleApiClient.Builder(this)
+                .addApi(LocationServices.API)
+                .addConnectionCallbacks(this)
+                .enableAutoManage(this, this);
+        mApiClient = builder.build();
+        //mApiClient.connect();
+    }
+
+    public void onConnected(@Nullable Bundle bundle) {
+        //Connected to the api... May start using the api
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+       /* Location lastLocation = LocationServices.FusedLocationApi.
+                getLastLocation(mApiClient);
+
+        if (lastLocation != null) {
+            tvLocation.setText(String.format("%s, %s",
+                    lastLocation.getLatitude(),
+                    lastLocation.getLongitude()));
+        }
+
+        */
+
+        LocationRequest locationRequest = new LocationRequest();
+        locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+        locationRequest.setInterval(10 * 1000);
+        locationRequest.setFastestInterval(1000);
+
+        LocationServices.FusedLocationApi.requestLocationUpdates(mApiClient,
+                locationRequest,
+                this);
+
+
+    }
+
+    public void onConnectionSuspended(int i) {
+    }
+
+    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
+    }
+
+    public void onRequestPermissionsResult(int requestCode,
+                                           @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_LOCATION && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            requestLocation();
+        }
+    }
+
+    @Override
+    public void onLocationChanged(Location location) {
+        double longitude = location.getLongitude();
+        double latitude = location.getLatitude();
+
+        tvLocation.setText(String.format("%s, %s",
+                longitude, latitude));
     }
 }
