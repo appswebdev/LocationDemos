@@ -3,6 +3,7 @@
     package="minhal.tomer.edu.locationdemos">
 
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:allowBackup="true"
@@ -34,7 +35,12 @@
 
         <activity
             android:name=".MapsActivity"
-            android:label="@string/title_activity_maps"></activity>
+            android:label="@string/title_activity_maps" />
+
+        <service
+            android:name=".MyCodingService"
+            android:enabled="true"
+            android:exported="true"></service>
     </application>
 
 </manifest>

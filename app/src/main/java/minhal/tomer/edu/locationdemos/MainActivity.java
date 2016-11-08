@@ -1,7 +1,10 @@
 package minhal.tomer.edu.locationdemos;
 
 import android.Manifest;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.net.Uri;
@@ -11,6 +14,7 @@ import android.support.annotation.Nullable;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.View;
@@ -42,6 +46,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     //Used later for location Requests.
     private GoogleApiClient mApiClient;
     private TextView tvLocation;
+    private GoogleMap mMap;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,6 +64,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         });
 
 
+
         requestLocation();
         if (savedInstanceState == null) {
             SupportMapFragment mapFragment = new SupportMapFragment();
@@ -67,6 +73,27 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             getSupportFragmentManager().beginTransaction().
                     replace(R.id.mapContainer, mapFragment).commit();
         }
+    }
+
+    BroadcastReceiver receiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+
+        }
+    };
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+
+        LocalBroadcastManager.getInstance(this).registerReceiver(receiver,
+                new IntentFilter(Constants.ACTION_GET_LOCATION));
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(receiver);
     }
 
     private void gotoMaps() {
@@ -99,6 +126,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     @Override
     public void onMapReady(GoogleMap map) {
+        mMap = map;
         LatLng markerPosition = new LatLng(31.252371, 34.8025847);
 
         map.setMapType(GoogleMap.MAP_TYPE_TERRAIN);
@@ -110,6 +138,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         );
 
         map.animateCamera(CameraUpdateFactory.newLatLngZoom(markerPosition, 12));
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
     }
 
     //Method that requires Permission
@@ -178,7 +209,19 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         double longitude = location.getLongitude();
         double latitude = location.getLatitude();
 
+        LatLng latLng = new LatLng(latitude, longitude);
+        if (mMap!=null){
+            mMap.addMarker(new MarkerOptions().position(latLng).title("Lehavim").snippet("WayPoint"));
+
+            mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 16));
+
+        }
         tvLocation.setText(String.format("%s, %s",
                 longitude, latitude));
+
+        Intent intent = new Intent(this, MyCodingService.class);
+        intent.putExtra(Constants.EXTRA_LOCATION, latLng);
+        startService(intent);
+        //Update the map
     }
 }
