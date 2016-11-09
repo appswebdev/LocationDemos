@@ -47,6 +47,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private GoogleApiClient mApiClient;
     private TextView tvLocation;
     private GoogleMap mMap;
+    private BroadcastReceiver mLocationAddressResultReceiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -63,7 +64,18 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             }
         });
 
+        mLocationAddressResultReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                LatLng latLng = intent.getParcelableExtra(Constants.EXTRA_LOCATION);
+                String address = intent.getStringExtra(Constants.EXTRA_LOCATION_ADDRESS);
 
+                if (mMap != null) {
+                    mMap.addMarker(new MarkerOptions().position(latLng).title(address));
+                    mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 16));
+                }
+            }
+        };
 
         requestLocation();
         if (savedInstanceState == null) {
@@ -75,25 +87,21 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     }
 
-    BroadcastReceiver receiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-
-        }
-    };
 
     @Override
     protected void onStart() {
         super.onStart();
+        LocalBroadcastManager manager = LocalBroadcastManager.getInstance(this);
+        IntentFilter filter = new IntentFilter(Constants.ACTION_LOCATION_RESULT);
+        manager.registerReceiver(mLocationAddressResultReceiver, filter);
 
-        LocalBroadcastManager.getInstance(this).registerReceiver(receiver,
-                new IntentFilter(Constants.ACTION_GET_LOCATION));
     }
 
     @Override
     protected void onStop() {
         super.onStop();
-        LocalBroadcastManager.getInstance(this).unregisterReceiver(receiver);
+        LocalBroadcastManager manager = LocalBroadcastManager.getInstance(this);
+        manager.unregisterReceiver(mLocationAddressResultReceiver);
     }
 
     private void gotoMaps() {
@@ -204,24 +212,28 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     }
 
+
     @Override
     public void onLocationChanged(Location location) {
         double longitude = location.getLongitude();
         double latitude = location.getLatitude();
 
         LatLng latLng = new LatLng(latitude, longitude);
-        if (mMap!=null){
+        //Update the map
+       /* if (mMap != null) {
             mMap.addMarker(new MarkerOptions().position(latLng).title("Lehavim").snippet("WayPoint"));
-
             mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 16));
-
-        }
+        }*/
         tvLocation.setText(String.format("%s, %s",
                 longitude, latitude));
 
-        Intent intent = new Intent(this, MyCodingService.class);
-        intent.putExtra(Constants.EXTRA_LOCATION, latLng);
-        startService(intent);
-        //Update the map
+        //We have the location:
+        //We want to Reverse geoCode the LatLng to an address:
+
+        Intent geoIntent = new Intent(this, MyGeoCodingService.class);
+        //Send paramteres with the intent
+        geoIntent.putExtra(Constants.EXTRA_LOCATION, latLng);
+        //start the service with the intent.
+        startService(geoIntent);
     }
 }

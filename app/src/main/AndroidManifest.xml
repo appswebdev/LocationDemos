@@ -38,7 +38,7 @@
             android:label="@string/title_activity_maps" />
 
         <service
-            android:name=".MyCodingService"
+            android:name=".MyGeoCodingService"
             android:enabled="true"
             android:exported="true"></service>
     </application>
