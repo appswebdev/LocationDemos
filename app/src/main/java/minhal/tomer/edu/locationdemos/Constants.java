@@ -12,4 +12,5 @@ public class Constants {
     public static final String ACTION_GET_LOCATION = "GetLocation";
     public static final String ACTION_LOCATION_RESULT = "ActionLocationResult";
     public static final String EXTRA_LOCATION_ADDRESS = "Address";
+    public static final int REQUEST_GEOFENCE = 11;
 }

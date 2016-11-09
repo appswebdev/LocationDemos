@@ -1,13 +1,17 @@
 package minhal.tomer.edu.locationdemos;
 
 import android.Manifest;
+import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.location.Address;
+import android.location.Geocoder;
 import android.location.Location;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -17,14 +21,20 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.util.Log;
 import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.common.api.Status;
+import com.google.android.gms.location.Geofence;
+import com.google.android.gms.location.GeofencingRequest;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
@@ -37,12 +47,15 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 
+import java.io.IOException;
+import java.util.List;
+
 public class MainActivity extends AppCompatActivity implements OnMapReadyCallback,
         GoogleApiClient.ConnectionCallbacks,
-        GoogleApiClient.OnConnectionFailedListener, LocationListener {
+        GoogleApiClient.OnConnectionFailedListener, LocationListener, ResultCallback<Status> {
 
     private static final int REQUEST_LOCATION = 10;
-
+    private EditText etSearch;
     //Used later for location Requests.
     private GoogleApiClient mApiClient;
     private TextView tvLocation;
@@ -56,6 +69,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         tvLocation = (TextView) findViewById(R.id.tvLocation);
+        etSearch = (EditText) findViewById(R.id.etSearch);
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -160,13 +174,15 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_LOCATION);
             return;
         }
+
+
         //we have the permission, Start Initing the API Client
         GoogleApiClient.Builder builder = new GoogleApiClient.Builder(this)
                 .addApi(LocationServices.API)
                 .addConnectionCallbacks(this)
                 .enableAutoManage(this, this);
         mApiClient = builder.build();
-        //mApiClient.connect();
+
     }
 
     public void onConnected(@Nullable Bundle bundle) {
@@ -184,6 +200,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
 
         */
+
+        addGeofence();
 
         LocationRequest locationRequest = new LocationRequest();
         locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
@@ -235,5 +253,79 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         geoIntent.putExtra(Constants.EXTRA_LOCATION, latLng);
         //start the service with the intent.
         startService(geoIntent);
+    }
+
+    private void addGeofence() {
+        Geofence.Builder builder = new Geofence.Builder();
+        builder.setCircularRegion(31.3690897, 34.8044, 100);
+        builder.setTransitionTypes(
+                Geofence.GEOFENCE_TRANSITION_ENTER | Geofence.GEOFENCE_TRANSITION_EXIT
+                //Geofence.GEOFENCE_TRANSITION_DWELL /*Dwell*/
+                );
+        //Dwell:
+        //builder.setLoiteringDelay(1000);
+        builder.setExpirationDuration(Geofence.NEVER_EXPIRE);
+
+        builder.setRequestId("RequestLocation");
+
+        Geofence geofence = builder.build();
+
+        GeofencingRequest geofencingRequest =
+                new GeofencingRequest.Builder().addGeofence(geofence)
+                        .setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER).
+                        build();
+
+        Intent geoFenceIntent = new Intent(this, MyGeoFenceService.class);
+        PendingIntent pendingIntent =
+                PendingIntent.getService(this,
+                        Constants.REQUEST_GEOFENCE, geoFenceIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        LocationServices.GeofencingApi.addGeofences(mApiClient, geofencingRequest, pendingIntent)
+        .setResultCallback(this);
+    }
+
+    public void search(View view) {
+        final String address = etSearch.getText().toString();
+
+        AsyncTask asyncTask = new AsyncTask() {
+            @Override
+            protected Object doInBackground(Object[] objects) {
+                Geocoder geocoder = new Geocoder(MainActivity.this);
+                try {
+                    List<Address> locations = geocoder.getFromLocationName(address, 1);
+                    if (locations != null && locations.size() > 0) {
+                        Address addr = locations.get(0);
+                        double longitude = addr.getLongitude();
+                        double latitude = addr.getLatitude();
+
+                        LatLng latLng = new LatLng(latitude, longitude);
+                        //Update the UI!!!
+                        return latLng;
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+                return null;
+            }
+
+            @Override
+            protected void onPostExecute(Object o) {
+                LatLng latLng = (LatLng) o;
+                if (mMap != null) {
+                    mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 16));
+                }
+            }
+        };
+        asyncTask.execute();
+    }
+
+    @Override
+    public void onResult(@NonNull Status status) {
+
     }
 }

@@ -40,6 +40,10 @@
         <service
             android:name=".MyGeoCodingService"
             android:enabled="true"
+            android:exported="true" />
+        <service
+            android:name=".MyGeoFenceService"
+            android:enabled="true"
             android:exported="true"></service>
     </application>
 
